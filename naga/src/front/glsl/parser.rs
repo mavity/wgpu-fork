@@ -264,7 +264,7 @@ impl Frontend {
                         value: PPTokenValue::Integer(int),
                         location,
                     }) => match int.value {
-                        440 | 450 | 460 => self.meta.version = int.value as u16,
+                        300 | 310 | 440 | 450 | 460 => self.meta.version = int.value as u16,
                         _ => self.errors.push(Error {
                             kind: ErrorKind::InvalidVersion(int.value),
                             meta: location.into(),
@@ -288,6 +288,7 @@ impl Frontend {
                         location,
                     }) => match name.as_str() {
                         "core" => self.meta.profile = Profile::Core,
+                        "es" => self.meta.profile = Profile::Es,
                         _ => self.errors.push(Error {
                             kind: ErrorKind::InvalidProfile(name),
                             meta: location.into(),

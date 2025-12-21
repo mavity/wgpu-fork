@@ -387,4 +387,6 @@ impl ParameterQualifier {
 pub enum Profile {
     /// The `core` profile, default when no profile is specified.
     Core,
+    /// The `es` profile.
+    Es,
 }
