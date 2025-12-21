@@ -612,6 +612,7 @@ impl Frontend {
                 let binding = match space {
                     AddressSpace::Uniform | AddressSpace::Storage { .. } | AddressSpace::Handle => {
                         let binding = qualifiers.uint_layout_qualifier("binding", &mut self.errors);
+                        /*
                         if binding.is_none() {
                             self.errors.push(Error {
                                 kind: ErrorKind::SemanticError(
@@ -620,6 +621,7 @@ impl Frontend {
                                 meta,
                             });
                         }
+                        */
                         let set = qualifiers.uint_layout_qualifier("set", &mut self.errors);
                         binding.map(|binding| ResourceBinding {
                             group: set.unwrap_or(0),
