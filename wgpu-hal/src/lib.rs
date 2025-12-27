@@ -2158,7 +2158,7 @@ pub struct BufferBinding<'a, B: DynBuffer + ?Sized> {
     /// This is not fully `pub` to prevent direct construction of
     /// `BufferBinding`s, while still allowing public read access to the `offset`
     /// and `size` properties.
-    pub(crate) buffer: &'a B,
+    pub buffer: &'a B,
 
     /// The offset at which the bound region starts.
     ///
