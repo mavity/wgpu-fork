@@ -12,8 +12,8 @@ use super::{
 };
 use crate::{
     front::Typifier, proc::Emitter, proc::Layouter, AddressSpace, Arena, BinaryOperator, Block,
-    Expression, FastHashMap, FunctionArgument, Handle, Literal, LocalVariable, RelationalFunction,
-    Scalar, Span, Statement, Type, TypeInner, VectorSize,
+    Expression, FastHashMap, FunctionArgument, Handle, ImageClass, Literal, LocalVariable,
+    RelationalFunction, Scalar, Span, Statement, Type, TypeInner, VectorSize,
 };
 
 /// The position at which an expression is, used while lowering
@@ -1463,6 +1463,63 @@ impl<'a> Context<'a> {
         }
 
         Ok(())
+    }
+
+    pub(crate) fn resolve_sampler(
+        &mut self,
+        image: Handle<Expression>,
+        meta: Span,
+    ) -> Result<Handle<Expression>> {
+        if let Some(sampler) = self.samplers.get(&image).copied() {
+            return Ok(sampler);
+        }
+
+        let is_comparison = match *self.resolve_type(image, meta)? {
+            TypeInner::Image { class, .. } => matches!(class, ImageClass::Depth { .. }),
+            _ => false,
+        };
+
+        let mut existing_sampler = None;
+        for (handle, var) in self.module.global_variables.iter() {
+            if let TypeInner::Sampler { comparison } = self.module.types[var.ty].inner {
+                if comparison == is_comparison {
+                    existing_sampler = Some(handle);
+                    break;
+                }
+            }
+        }
+
+        let handle = if let Some(handle) = existing_sampler {
+            handle
+        } else {
+            let ty = self.module.types.insert(
+                Type {
+                    name: None,
+                    inner: TypeInner::Sampler {
+                        comparison: is_comparison,
+                    },
+                },
+                Span::default(),
+            );
+            self.module.global_variables.append(
+                crate::GlobalVariable {
+                    name: Some(if is_comparison {
+                        "dummy_sampler_shadow".into()
+                    } else {
+                        "dummy_sampler".into()
+                    }),
+                    space: AddressSpace::Handle,
+                    binding: None,
+                    ty,
+                    init: None,
+                },
+                Span::default(),
+            )
+        };
+
+        let expr = self.add_expression(Expression::GlobalVariable(handle), meta)?;
+        self.samplers.insert(image, expr);
+        Ok(expr)
     }
 
     pub fn implicit_splat(

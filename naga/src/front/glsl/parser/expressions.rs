@@ -165,12 +165,22 @@ impl ParsingContext<'_> {
                 )
             }
 
+            let kind = match ctx.module.types[handle].inner {
+                TypeInner::Image { .. } if args.len() == 2 => {
+                    if let Some(name) = crate::front::glsl::types::image_type_to_name(
+                        &ctx.module.types[handle].inner,
+                    ) {
+                        FunctionCallKind::Function(name)
+                    } else {
+                        FunctionCallKind::TypeConstructor(handle)
+                    }
+                }
+                _ => FunctionCallKind::TypeConstructor(handle),
+            };
+
             stmt.hir_exprs.append(
                 HirExpr {
-                    kind: HirExprKind::Call(FunctionCall {
-                        kind: FunctionCallKind::TypeConstructor(handle),
-                        args,
-                    }),
+                    kind: HirExprKind::Call(FunctionCall { kind, args }),
                     meta,
                 },
                 Default::default(),

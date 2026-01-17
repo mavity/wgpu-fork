@@ -1106,7 +1106,9 @@ impl super::Validator {
         }
 
         if is_resource != var.binding.is_some() {
-            if self.flags.contains(super::ValidationFlags::BINDINGS) && var.space != crate::AddressSpace::Uniform {
+            if self.flags.contains(super::ValidationFlags::BINDINGS)
+                && var.space != crate::AddressSpace::Uniform
+            {
                 return Err(GlobalVariableError::InvalidBinding);
             }
         }

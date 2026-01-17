@@ -1,4 +1,4 @@
-use alloc::format;
+use alloc::{format, string::String};
 
 use super::{context::Context, Error, ErrorKind, Result, Span};
 use crate::{
@@ -188,9 +188,74 @@ pub fn parse_type(type_name: &str) -> Option<Type> {
                 })
             };
 
+            let sampler_parse = |word: &str| {
+                let mut iter = word.split("sampler");
+
+                let kind = iter.next()?;
+                let size = iter.next()?;
+
+                let kind = match kind {
+                    "" => ScalarKind::Float,
+                    "i" => ScalarKind::Sint,
+                    "u" => ScalarKind::Uint,
+                    _ => return None,
+                };
+
+                let sampled = |multi| ImageClass::Sampled { kind, multi };
+
+                let (dim, arrayed, class) = match size {
+                    "1D" => (ImageDimension::D1, false, sampled(false)),
+                    "1DArray" => (ImageDimension::D1, true, sampled(false)),
+                    "2D" => (ImageDimension::D2, false, sampled(false)),
+                    "2DArray" => (ImageDimension::D2, true, sampled(false)),
+                    "2DMS" => (ImageDimension::D2, false, sampled(true)),
+                    "2DMSArray" => (ImageDimension::D2, true, sampled(true)),
+                    "3D" => (ImageDimension::D3, false, sampled(false)),
+                    "Cube" => (ImageDimension::Cube, false, sampled(false)),
+                    "CubeArray" => (ImageDimension::Cube, true, sampled(false)),
+                    "1DShadow" => (
+                        ImageDimension::D1,
+                        false,
+                        ImageClass::Depth { multi: false },
+                    ),
+                    "1DArrayShadow" => {
+                        (ImageDimension::D1, true, ImageClass::Depth { multi: false })
+                    }
+                    "2DShadow" => (
+                        ImageDimension::D2,
+                        false,
+                        ImageClass::Depth { multi: false },
+                    ),
+                    "2DArrayShadow" => {
+                        (ImageDimension::D2, true, ImageClass::Depth { multi: false })
+                    }
+                    "CubeShadow" => (
+                        ImageDimension::Cube,
+                        false,
+                        ImageClass::Depth { multi: false },
+                    ),
+                    "CubeArrayShadow" => (
+                        ImageDimension::Cube,
+                        true,
+                        ImageClass::Depth { multi: false },
+                    ),
+                    _ => return None,
+                };
+
+                Some(Type {
+                    name: None,
+                    inner: TypeInner::Image {
+                        dim,
+                        arrayed,
+                        class,
+                    },
+                })
+            };
+
             vec_parse(word)
                 .or_else(|| mat_parse(word))
                 .or_else(|| texture_parse(word))
+                .or_else(|| sampler_parse(word))
                 .or_else(|| image_parse(word))
         }
     }
@@ -214,6 +279,59 @@ pub const fn type_power(scalar: Scalar) -> Option<u32> {
         ScalarKind::Float => 3,
         ScalarKind::Bool | ScalarKind::AbstractInt | ScalarKind::AbstractFloat => return None,
     })
+}
+
+pub fn image_type_to_name(inner: &TypeInner) -> Option<String> {
+    if let TypeInner::Image {
+        dim,
+        arrayed,
+        class,
+    } = inner
+    {
+        let mut name = String::new();
+        match class {
+            ImageClass::Sampled { kind, multi } => {
+                match kind {
+                    ScalarKind::Sint => name.push('i'),
+                    ScalarKind::Uint => name.push('u'),
+                    _ => {}
+                }
+                name.push_str("sampler");
+                match dim {
+                    ImageDimension::D1 => name.push_str("1D"),
+                    ImageDimension::D2 => name.push_str("2D"),
+                    ImageDimension::D3 => name.push_str("3D"),
+                    ImageDimension::Cube => name.push_str("Cube"),
+                }
+                if *multi {
+                    name.push_str("MS");
+                }
+                if *arrayed {
+                    name.push_str("Array");
+                }
+                return Some(name);
+            }
+            ImageClass::Depth { multi } => {
+                name.push_str("sampler");
+                match dim {
+                    ImageDimension::D1 => name.push_str("1D"),
+                    ImageDimension::D2 => name.push_str("2D"),
+                    ImageDimension::D3 => name.push_str("3D"),
+                    ImageDimension::Cube => name.push_str("Cube"),
+                }
+                if *multi {
+                    name.push_str("MS");
+                }
+                if *arrayed {
+                    name.push_str("Array");
+                }
+                name.push_str("Shadow");
+                return Some(name);
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 impl Context<'_> {

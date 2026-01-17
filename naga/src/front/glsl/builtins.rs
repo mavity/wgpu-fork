@@ -2068,33 +2068,27 @@ fn texture_call(
     offset: Option<Handle<Expression>>,
     meta: Span,
 ) -> Result<Handle<Expression>> {
-    if let Some(sampler) = ctx.samplers.get(&image).copied() {
-        let mut array_index = comps.array_index;
+    let sampler = ctx.resolve_sampler(image, meta)?;
+    let mut array_index = comps.array_index;
 
-        if let Some(ref mut array_index_expr) = array_index {
-            ctx.conversion(array_index_expr, meta, Scalar::I32)?;
-        }
-
-        Ok(ctx.add_expression(
-            Expression::ImageSample {
-                image,
-                sampler,
-                gather: None, //TODO
-                coordinate: comps.coordinate,
-                array_index,
-                offset,
-                level,
-                depth_ref: comps.depth_ref,
-                clamp_to_edge: false,
-            },
-            meta,
-        )?)
-    } else {
-        Err(Error {
-            kind: ErrorKind::SemanticError("Bad call".into()),
-            meta,
-        })
+    if let Some(ref mut array_index_expr) = array_index {
+        ctx.conversion(array_index_expr, meta, Scalar::I32)?;
     }
+
+    Ok(ctx.add_expression(
+        Expression::ImageSample {
+            image,
+            sampler,
+            gather: None, //TODO
+            coordinate: comps.coordinate,
+            array_index,
+            offset,
+            level,
+            depth_ref: comps.depth_ref,
+            clamp_to_edge: false,
+        },
+        meta,
+    )?)
 }
 
 /// Helper struct for texture calls with the separate components from the vector argument
