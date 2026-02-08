@@ -32,6 +32,15 @@ struct BuiltInData {
     storage: StorageQualifier,
 }
 
+// Names that are declared in GLSL as `int` and should be exposed as signed
+// at the expression level, even if the underlying IR/global storage remains
+// `u32` for implementation convenience.
+pub(crate) fn is_canonical_glsl_signed(name: &str) -> bool {
+    matches!(
+        name,
+        "gl_VertexID" | "gl_InstanceID" | "gl_PrimitiveID" | "gl_SampleID"
+    )
+}
 pub enum GlobalOrConstant {
     Global(Handle<GlobalVariable>),
     Constant(Handle<Constant>),
@@ -83,11 +92,39 @@ impl Frontend {
             },
         ));
 
-        let expr = ctx.add_expression(Expression::GlobalVariable(handle), meta)?;
+        let base_expr = ctx.add_expression(Expression::GlobalVariable(handle), meta)?;
+
+        // If this name is a canonical GLSL identifier that should be treated as
+        // a signed `int`, expose an expression that is an explicit load and an
+        // `As` cast to Sint so the rest of the frontend sees `i32`. Keep the
+        // underlying global variable as-is to avoid broad IR changes.
+        let (expr, load) = if is_canonical_glsl_signed(name) {
+            // Only attempt to load if the global is not an opaque Handle.
+            if ctx.module.global_variables[handle].space != AddressSpace::Handle {
+                let loaded = ctx.add_expression(Expression::Load { pointer: base_expr }, meta)?;
+                let cast = ctx.add_expression(
+                    Expression::As {
+                        expr: loaded,
+                        kind: ScalarKind::Sint,
+                        convert: Some(4),
+                    },
+                    meta,
+                )?;
+
+                // We store the value expression directly and mark `load` false
+                // since the variable expression already yields the value.
+                (cast, false)
+            } else {
+                // Fallback: keep the base expression (rare case)
+                (base_expr, ctx.module.global_variables[handle].space != AddressSpace::Handle)
+            }
+        } else {
+            (base_expr, ctx.module.global_variables[handle].space != AddressSpace::Handle)
+        };
 
         let var = VariableReference {
             expr,
-            load: true,
+            load,
             mutable: data.mutable,
             constant: None,
             entry_arg: Some(idx),

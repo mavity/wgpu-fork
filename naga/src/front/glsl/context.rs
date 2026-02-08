@@ -229,7 +229,13 @@ impl<'a> Context<'a> {
             entry_arg,
         };
 
-        self.symbol_table.add(name.into(), var);
+        // If a root binding already exists (e.g., created by the frontend for
+        // builtins via `add_builtin` and `add_root`) do not overwrite it. This
+        // preserves earlier semantics where canonical GLSL builtins were
+        // exposed as value expressions (As(Load(...))) by the frontend.
+        if self.symbol_table.lookup(name).is_none() {
+            self.symbol_table.add(name.into(), var);
+        }
 
         Ok(())
     }

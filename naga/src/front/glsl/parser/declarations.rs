@@ -514,9 +514,10 @@ impl ParsingContext<'_> {
                             kind: ScalarKind::Float | ScalarKind::Sint,
                             ..
                         }) => {}
+                        TypeInner::Image { .. } | TypeInner::Sampler { .. } => {}
                         _ => frontend.errors.push(Error {
                             kind: ErrorKind::SemanticError(
-                                "Precision statement can only work on floats and ints".into(),
+                                "Precision statement can only work on floats, ints, samplers and images".into(),
                             ),
                             meta,
                         }),
